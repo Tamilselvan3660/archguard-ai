@@ -5,11 +5,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://archguard-backend.onrender.com/api/$1"
-    },
-    {
-      "source": "/((?!assets/|favicon\\.ico|.*\\..*).*)",
+      "source": "/((?!api/|assets/|favicon\\.ico|.*\\..*).*)",
       "destination": "/index.html"
     }
   ],

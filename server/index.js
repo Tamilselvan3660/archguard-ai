@@ -347,21 +347,16 @@ app.post('/api/auth/verify-otp', (req, res) => {
     return res.status(400).json({ error: 'Email and OTP code are required' });
   }
 
-  const isTamil = email.includes('selvan') || email.includes('tamil');
+  const isSiva = email.includes('sivakumar') || email === 'sivakumar463703@gmail.com';
+  const isTamil = email.includes('selvan') || email.includes('tamil') || email === 'selvantamil84786@gmail.com';
 
-  const personaMap = {
-    'sarah.lin@enterprise.io': { name: 'Sarah Lin', role: 'Lead Enterprise Architect', avatar: 'SL', color: 'var(--accent-cyan)' },
-    'alex.chen@enterprise.io': { name: 'Alex Chen', role: 'Principal Systems Engineer', avatar: 'AC', color: 'var(--accent-purple)' },
-    'marcus.vance@security.io': { name: 'Marcus Vance', role: 'Security & Compliance Auditor', avatar: 'MV', color: 'var(--accent-emerald)' }
-  };
-
-  const getProfile = () => personaMap[email] || {
-    name: isTamil ? 'Tamil Selvan' : email.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase()),
-    role: isTamil ? 'Chief Software Architect (Email Verified)' : 'Staff Architect (Email OTP Verified)',
-    avatar: isTamil ? 'TS' : email.slice(0, 2).toUpperCase(),
-    color: isTamil ? '#3b82f6' : 'var(--accent-cyan)',
+  const getProfile = () => ({
+    name: isSiva ? 'Sivakumar' : (isTamil ? 'Tamil Selvan' : email.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase())),
+    role: (isSiva || isTamil) ? 'Chief Software Architect (Email Verified)' : 'Staff Architect (Email OTP Verified)',
+    avatar: isSiva ? 'SK' : (isTamil ? 'TS' : email.slice(0, 2).toUpperCase()),
+    color: isSiva ? '#0284c7' : '#3b82f6',
     roles: ['SUPER_ADMIN', 'CHIEF_ARCHITECT', 'CLOUD_VAULT_AUTHORIZED']
-  };
+  });
 
   const record = otpStore.get(email);
   if (record) {
@@ -440,7 +435,12 @@ app.post('/api/auth/google', (req, res) => {
   let userRole = 'Lead Enterprise Architect (Google Verified)';
   let userColor = 'var(--accent-cyan)';
 
-  if (userEmail.includes('selvan') || userEmail.includes('tamil') || userEmail === 'selvantamil84786@gmail.com') {
+  if (userEmail.includes('sivakumar') || userEmail === 'sivakumar463703@gmail.com') {
+    userName = 'Sivakumar';
+    userRole = 'Chief Software Architect (Google Verified)';
+    userAvatar = 'SK';
+    userColor = '#0284c7';
+  } else if (userEmail.includes('selvan') || userEmail.includes('tamil') || userEmail === 'selvantamil84786@gmail.com') {
     userName = 'Tamil Selvan';
     userRole = 'Chief Software Architect (Google Verified)';
     userAvatar = 'TS';
