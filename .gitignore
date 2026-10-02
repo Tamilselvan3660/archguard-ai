@@ -35,3 +35,5 @@ scratch/
 .tempmediaStorage/
 server/data/cloud_db/
 powershell.cmd
+
+.vercel
