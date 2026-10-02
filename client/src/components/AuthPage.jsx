@@ -205,45 +205,40 @@ export default function AuthPage({ onLogin, onShowToast }) {
     setIsLoading(true);
     setErrorMsg(null);
 
-    const isTamil = targetEmail.includes('selvan') || targetEmail.includes('tamil');
-    const resolvedName = name.trim() || (isTamil ? 'Tamil Selvan' : targetEmail.split('@')[0]);
-
-    const resolvedUser = {
-      id: `user-${Date.now()}`,
-      name: resolvedName,
-      username: resolvedName,
-      email: targetEmail.toLowerCase(),
-      role: role || (isTamil ? 'Chief Software Architect' : 'Enterprise Architect'),
-      avatar: resolvedName.slice(0, 2).toUpperCase(),
-      color: '#2563eb',
-      authProvider: 'Account Credentials',
-      roles: ['CHIEF_ARCHITECT', 'PLATFORM_MEMBER']
-    };
-
     try {
-      const res = await fetch('/api/auth/login-credentials', {
+      const endpoint = isRegisterMode ? '/api/auth/register' : '/api/auth/login';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: targetEmail,
           password: password.trim(),
-          username: resolvedName
+          name: name.trim() || targetEmail.split('@')[0]
         })
       });
       const data = await res.json().catch(() => null);
-      if (data?.success && data.user) {
-        if (onShowToast) onShowToast(`✓ Signed in as ${data.user.name}`);
-        onLogin(data.user);
+      if (data?.success) {
+        if (data.requiresVerification || isRegisterMode) {
+          // Switch to OTP verification mode
+          setAuthMode('otp');
+          setOtpStep('enter-code');
+          setOtpDigits(['', '', '', '', '', '']);
+          setTimer(60);
+          setTimerActive(true);
+          if (onShowToast) onShowToast(data.message || `✓ Verification code sent to ${targetEmail}`);
+        } else if (data.user) {
+          if (onShowToast) onShowToast(`✓ Signed in as ${data.user.name}`);
+          onLogin(data.user);
+        }
         return;
+      } else {
+        setErrorMsg(data?.error || 'Authentication failed. Please check your credentials.');
       }
     } catch {
-      // Fallback
+      setErrorMsg('Could not connect to authentication service. Please check your connection.');
     } finally {
       setIsLoading(false);
     }
-
-    if (onShowToast) onShowToast(`✓ Account verified for ${resolvedUser.name}!`);
-    onLogin(resolvedUser);
   };
 
   const handleDigitChange = (index, value) => {
@@ -603,7 +598,7 @@ export default function AuthPage({ onLogin, onShowToast }) {
               {isLoading ? 'Processing...' : (isRegisterMode ? 'Create Account & Open Portal' : 'Sign In to Account')}
             </button>
 
-            <div style={{ textAlign: 'center', marginTop: '6px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.8rem' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -612,8 +607,32 @@ export default function AuthPage({ onLogin, onShowToast }) {
                 }}
                 style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
               >
-                {isRegisterMode ? 'Already have an account? Sign In' : "Don't have an account? Create an Account"}
+                {isRegisterMode ? 'Already have an account?' : "Don't have an account?"}
               </button>
+              
+              {!isRegisterMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetEmail = prompt('Enter your email to reset password:');
+                    if (targetEmail) {
+                      fetch('/api/auth/forgot-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: targetEmail })
+                      }).then(() => {
+                        setEmail(targetEmail);
+                        setAuthMode('otp');
+                        setOtpStep('enter-code');
+                        if (onShowToast) onShowToast('Password reset instructions sent');
+                      });
+                    }
+                  }}
+                  style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.82rem', cursor: 'pointer' }}
+                >
+                  Forgot Password?
+                </button>
+              )}
             </div>
           </form>
         )}

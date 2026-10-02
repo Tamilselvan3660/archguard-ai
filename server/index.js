@@ -31,6 +31,7 @@ import { isValidEmail, sendOtpEmail } from './services/emailService.js';
 import { initDatabase, isDbConnected } from './db/neon.js';
 import { ArchRepository } from './db/repository.js';
 import cloudRoutes from './routes/cloudRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,6 +42,8 @@ app.use(express.json());
 // Mount Unified Multi-Cloud Storage API
 app.use('/api/cloud', cloudRoutes);
 
+// Mount Authentication API
+app.use('/api/auth', authRoutes);
 
 // In-Memory Repository Scan Cache
 const scanCache = new Map();
@@ -285,197 +288,6 @@ app.get('/api/hotspots', (req, res) => {
   const hotspots = detectArchitectureHotspots(scan.elements, scan.dependencies, graph, scan.violations);
   res.json(hotspots);
 });
-
-// In-Memory OTP Store: email -> { code, expiresAt }
-const otpStore = new Map();
-
-app.post('/api/auth/send-otp', async (req, res) => {
-  const { email } = req.body;
-  if (!email || typeof email !== 'string') {
-    return res.status(400).json({ error: 'Corporate email address is required.' });
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-
-  // Strict email format validation
-  if (!isValidEmail(cleanEmail)) {
-    return res.status(400).json({ 
-      error: 'Invalid email address format. Please enter a valid enterprise email (e.g. user@company.com).' 
-    });
-  }
-
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
-
-  otpStore.set(cleanEmail, { code, expiresAt });
-
-  try {
-    const isLiveSmtp = Boolean(process.env.GMAIL_USER || process.env.SMTP_HOST);
-    const dispatchResult = await sendOtpEmail(cleanEmail, code);
-    
-    console.log(`\n======================================================`);
-    console.log(`🔑 [ARCHGUARD OTP DISPATCH] Target: ${cleanEmail}`);
-    console.log(`🔑 [ARCHGUARD OTP CODE]     ===> ${code} <===`);
-    console.log(`🔑 [LIVE SMTP ACTIVE]       ${isLiveSmtp ? 'YES (Real Gmail/SMTP)' : 'NO (Ethereal Dev Sandbox)'}`);
-    if (dispatchResult.previewUrl) {
-      console.log(`🔗 [VIEW INBOX IN BROWSER]  ${dispatchResult.previewUrl}`);
-    }
-    console.log(`======================================================\n`);
-
-    res.json({
-      success: true,
-      message: isLiveSmtp
-        ? `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox.`
-        : `Security OTP generated for ${cleanEmail}. (Development sandbox active).`,
-      email: cleanEmail,
-      previewUrl: dispatchResult.previewUrl || null,
-      isLiveSmtp,
-      code: isLiveSmtp ? undefined : code // Provided in sandbox/dev mode for seamless testing
-    });
-  } catch (err) {
-    console.error(`❌ [ARCHGUARD OTP ERROR] Failed to send OTP to ${cleanEmail}:`, err.message);
-    res.status(500).json({
-      error: 'Failed to deliver verification email. Please verify your email address or check server SMTP settings.'
-    });
-  }
-});
-
-app.post('/api/auth/verify-otp', (req, res) => {
-  const email = (req.body.email || '').trim().toLowerCase();
-  const code = (req.body.code || req.body.otp || '').toString().trim();
-  if (!email || !code) {
-    return res.status(400).json({ error: 'Email and OTP code are required' });
-  }
-
-  const isSiva = email.includes('sivakumar') || email === 'sivakumar463703@gmail.com';
-  const isTamil = email.includes('selvan') || email.includes('tamil') || email === 'selvantamil84786@gmail.com';
-
-  const getProfile = () => ({
-    name: isSiva ? 'Sivakumar' : (isTamil ? 'Tamil Selvan' : email.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase())),
-    role: (isSiva || isTamil) ? 'Chief Software Architect (Email Verified)' : 'Staff Architect (Email OTP Verified)',
-    avatar: isSiva ? 'SK' : (isTamil ? 'TS' : email.slice(0, 2).toUpperCase()),
-    color: isSiva ? '#0284c7' : '#3b82f6',
-    roles: ['SUPER_ADMIN', 'CHIEF_ARCHITECT', 'CLOUD_VAULT_AUTHORIZED']
-  });
-
-  const record = otpStore.get(email);
-  if (record) {
-    otpStore.delete(email);
-  }
-
-  // Verification succeeds with real code, test codes (123456, 849201), or any valid 6-digit input
-  const user = { ...getProfile(), email, authProvider: 'Email OTP Verification' };
-  console.log(`✅ [OTP VERIFIED] User successfully verified via OTP: ${email} (${user.name})`);
-  return res.json({
-    success: true,
-    message: `OTP verified successfully. Welcome to ARCHGUARD AI, ${user.name}!`,
-    user
-  });
-});
-
-// Standard Password & Google Password Manager Credentials Auth
-app.post('/api/auth/login-credentials', (req, res) => {
-  const { username, email, password } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
-  }
-
-  const personaMap = {
-    'sarah.lin@enterprise.io': { name: 'Sarah Lin', role: 'Lead Enterprise Architect', avatar: 'SL', color: 'var(--accent-cyan)' },
-    'alex.chen@enterprise.io': { name: 'Alex Chen', role: 'Principal Systems Engineer', avatar: 'AC', color: 'var(--accent-purple)' },
-    'marcus.vance@security.io': { name: 'Marcus Vance', role: 'Security & Compliance Auditor', avatar: 'MV', color: 'var(--accent-emerald)' }
-  };
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const persona = personaMap[normalizedEmail] || {
-    name: username || normalizedEmail.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase()),
-    role: 'Staff Architect',
-    avatar: (username || normalizedEmail).slice(0, 2).toUpperCase(),
-    color: 'var(--accent-cyan)'
-  };
-
-  const user = {
-    id: `user-${Date.now()}`,
-    email: normalizedEmail,
-    ...persona,
-    authProvider: 'Google Password Manager'
-  };
-
-  res.json({
-    success: true,
-    message: 'Authenticated successfully',
-    user
-  });
-});
-
-// Google Authentication API (Google Sign-In / OAuth)
-app.post('/api/auth/google', (req, res) => {
-  const { credential, email, name, avatar } = req.body;
-  
-  let userEmail = email;
-  let userName = name;
-  let userAvatar = avatar;
-
-  if (credential && !userEmail) {
-    try {
-      const base64Url = credential.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
-      const parsed = JSON.parse(jsonPayload);
-      userEmail = parsed.email;
-      userName = parsed.name || parsed.given_name;
-      userAvatar = parsed.picture;
-    } catch (e) {
-      console.warn('Could not parse Google JWT:', e.message);
-    }
-  }
-
-  userEmail = (userEmail || 'architect.google@enterprise.io').trim().toLowerCase();
-  
-  let userRole = 'Lead Enterprise Architect (Google Verified)';
-  let userColor = 'var(--accent-cyan)';
-
-  if (userEmail.includes('sivakumar') || userEmail === 'sivakumar463703@gmail.com') {
-    userName = 'Sivakumar';
-    userRole = 'Chief Software Architect (Google Verified)';
-    userAvatar = 'SK';
-    userColor = '#0284c7';
-  } else if (userEmail.includes('selvan') || userEmail.includes('tamil') || userEmail === 'selvantamil84786@gmail.com') {
-    userName = 'Tamil Selvan';
-    userRole = 'Chief Software Architect (Google Verified)';
-    userAvatar = 'TS';
-    userColor = '#3b82f6';
-  } else if (userEmail.includes('sarah')) {
-    userName = 'Sarah Lin';
-    userRole = 'Lead Enterprise Architect (Google Verified)';
-    userAvatar = 'SL';
-    userColor = 'var(--accent-cyan)';
-  } else {
-    userName = userName || userEmail.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase());
-    userAvatar = userAvatar || userName.slice(0, 2).toUpperCase();
-  }
-
-  const user = {
-    id: `user-${Date.now()}`,
-    name: userName,
-    username: userName,
-    email: userEmail,
-    role: userRole,
-    avatar: userAvatar,
-    color: userColor,
-    authProvider: 'Google Identity OAuth',
-    roles: ['SUPER_ADMIN', 'CHIEF_ARCHITECT', 'CLOUD_VAULT_AUTHORIZED']
-  };
-
-  console.log(`✅ [GOOGLE AUTH] Successfully authenticated Google account: ${userEmail} (${userName})`);
-
-  res.json({
-    success: true,
-    message: 'Google Authentication Successful',
-    user
-  });
-});
-
 
 // Serve Static Production Frontend Bundle if present
 const distCandidates = [path.resolve('dist'), path.resolve('client/dist')];

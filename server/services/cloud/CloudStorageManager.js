@@ -9,6 +9,7 @@
 import { GoogleDriveProvider } from './GoogleDriveProvider.js';
 import { OneDriveProvider } from './OneDriveProvider.js';
 import { MegaProvider } from './MegaProvider.js';
+import { NeonS3Provider } from './NeonS3Provider.js';
 import { CloudConnection } from '../../models/CloudConnection.js';
 import { CloudFile } from '../../models/CloudFile.js';
 import { CloudAuditLog } from '../../models/CloudAuditLog.js';
@@ -23,6 +24,19 @@ class CloudStorageManagerClass {
     this.registerProvider(new GoogleDriveProvider());
     this.registerProvider(new OneDriveProvider());
     this.registerProvider(new MegaProvider());
+
+    // Register Neon S3-compatible object storage
+    const neonS3 = new NeonS3Provider();
+    this.registerProvider(neonS3);
+
+    // Auto-connect Neon S3 for all users if credentials are present
+    if (neonS3.isConfigured()) {
+      neonS3.authenticate('default_user').then(() => {
+        console.log('[CloudStorageManager] Neon S3 auto-connected for default_user');
+      }).catch(e => {
+        console.warn('[CloudStorageManager] Neon S3 auto-connect failed:', e.message || e);
+      });
+    }
   }
 
   /**

@@ -26,6 +26,7 @@ export default function CloudDashboard({ currentUser, onShowToast }) {
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [folderTargetProvider, setFolderTargetProvider] = useState('google_drive');
+  const [folderError, setFolderError] = useState('');
   
   const [showRenameModal, setShowRenameModal] = useState(null); // file object or null
   const [renameValue, setRenameValue] = useState('');
@@ -332,6 +333,7 @@ export default function CloudDashboard({ currentUser, onShowToast }) {
   const handleCreateFolder = async (e) => {
     e.preventDefault();
     if (!newFolderName.trim()) return;
+    setFolderError('');
 
     try {
       const res = await fetch(`/api/cloud/${folderTargetProvider}/folder`, {
@@ -350,12 +352,13 @@ export default function CloudDashboard({ currentUser, onShowToast }) {
         if (onShowToast) onShowToast(`Created folder "${newFolderName}" in ${folderTargetProvider}`, 'success');
         setShowFolderModal(false);
         setNewFolderName('');
+        setFolderError('');
         fetchFiles();
       } else {
-        if (onShowToast) onShowToast(data.message || 'Could not create folder', 'error');
+        setFolderError(data.message || 'Could not create folder. Please try again.');
       }
     } catch (err) {
-      if (onShowToast) onShowToast('Error creating folder', 'error');
+      setFolderError('Network error while creating folder. Please check your connection.');
     }
   };
 
@@ -567,7 +570,14 @@ export default function CloudDashboard({ currentUser, onShowToast }) {
               alignItems: 'center',
               gap: '6px'
             }}
-            onClick={() => setShowFolderModal(true)}
+            onClick={() => {
+              // Auto-select first connected provider
+              const connected = providers.filter(p => p.isConnected);
+              if (connected.length > 0) setFolderTargetProvider(connected[0].id);
+              setNewFolderName('');
+              setFolderError('');
+              setShowFolderModal(true);
+            }}
           >
             <span>📁</span>
             <span>New Folder</span>
@@ -1947,9 +1957,19 @@ export default function CloudDashboard({ currentUser, onShowToast }) {
                     color: 'var(--text-primary)'
                   }}
                 >
-                  <option value="google_drive">Google Drive</option>
-                  <option value="onedrive">OneDrive</option>
-                  <option value="mega">MEGA</option>
+                  {providers.length > 0 ? (
+                    providers.map(p => (
+                      <option key={p.id} value={p.id} disabled={!p.isConnected}>
+                        {p.name}{!p.isConnected ? ' (not connected)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="google_drive">Google Drive</option>
+                      <option value="onedrive">OneDrive</option>
+                      <option value="mega">MEGA</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -1974,6 +1994,21 @@ export default function CloudDashboard({ currentUser, onShowToast }) {
                   }}
                 />
               </div>
+
+              {/* Inline error display */}
+              {folderError && (
+                <div style={{
+                  marginBottom: '12px',
+                  padding: '8px 12px',
+                  background: 'rgba(239,68,68,0.08)',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  color: '#dc2626'
+                }}>
+                  ⚠️ {folderError}
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button

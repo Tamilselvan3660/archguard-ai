@@ -19,6 +19,7 @@
 import express from 'express';
 import multer from 'multer';
 import { cloudController } from '../controllers/cloudController.js';
+import { requireRecentVerification } from '../middleware/verificationMiddleware.js';
 
 // Lightweight passthrough middleware (no IAM required)
 function authenticate(req, res, next) {
@@ -50,7 +51,7 @@ router.use(authenticate);
 
 // 1. Provider Management Endpoints
 router.get('/providers', cloudController.listProviders);
-router.get('/connect/:provider', cloudController.getConnectUrl);
+router.get('/connect/:provider', requireRecentVerification(15), cloudController.getConnectUrl);
 router.post('/callback/:provider', cloudController.handleCallback);
 router.get('/callback/:provider', (req, res) => {
   // Handle GET redirect from OAuth providers: redirect to frontend callback view
@@ -58,9 +59,9 @@ router.get('/callback/:provider', (req, res) => {
   const { code, state } = req.query;
   res.redirect(`http://localhost:5173/?cloud_callback=${provider}&code=${code}&state=${state}`);
 });
-router.post('/demo-connect/:provider', cloudController.demoConnect);
-router.get('/demo-connect/:provider', cloudController.demoConnect);
-router.post('/disconnect/:provider', cloudController.disconnect);
+router.post('/demo-connect/:provider', requireRecentVerification(15), cloudController.demoConnect);
+router.get('/demo-connect/:provider', requireRecentVerification(15), cloudController.demoConnect);
+router.post('/disconnect/:provider', requireRecentVerification(15), cloudController.disconnect);
 
 // 2. Multi-Cloud Unified Endpoints
 router.get('/unified/files', cloudController.unifiedList);
