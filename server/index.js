@@ -419,19 +419,39 @@ app.post('/api/auth/google', (req, res) => {
     }
   }
 
-  userEmail = userEmail || 'architect.google@enterprise.io';
-  userName = userName || 'Google Enterprise Architect';
+  userEmail = (userEmail || 'architect.google@enterprise.io').trim().toLowerCase();
+  
+  let userRole = 'Lead Enterprise Architect (Google Verified)';
+  let userColor = 'var(--accent-cyan)';
+
+  if (userEmail.includes('selvan') || userEmail.includes('tamil') || userEmail === 'selvantamil84786@gmail.com') {
+    userName = 'Tamil Selvan';
+    userRole = 'Chief Software Architect (Google Verified)';
+    userAvatar = 'TS';
+    userColor = '#3b82f6';
+  } else if (userEmail.includes('sarah')) {
+    userName = 'Sarah Lin';
+    userRole = 'Lead Enterprise Architect (Google Verified)';
+    userAvatar = 'SL';
+    userColor = 'var(--accent-cyan)';
+  } else {
+    userName = userName || userEmail.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase());
+    userAvatar = userAvatar || userName.slice(0, 2).toUpperCase();
+  }
 
   const user = {
     id: `user-${Date.now()}`,
     name: userName,
     username: userName,
     email: userEmail,
-    role: 'Lead Enterprise Architect',
-    avatar: userAvatar || userName.slice(0, 2).toUpperCase(),
-    color: 'var(--accent-cyan)',
-    authProvider: 'Google Identity OAuth'
+    role: userRole,
+    avatar: userAvatar,
+    color: userColor,
+    authProvider: 'Google Identity OAuth',
+    roles: ['SUPER_ADMIN', 'CHIEF_ARCHITECT', 'CLOUD_VAULT_AUTHORIZED']
   };
+
+  console.log(`✅ [GOOGLE AUTH] Successfully authenticated Google account: ${userEmail} (${userName})`);
 
   res.json({
     success: true,
@@ -439,6 +459,7 @@ app.post('/api/auth/google', (req, res) => {
     user
   });
 });
+
 
 // Serve Static Production Frontend Bundle if present
 const distCandidates = [path.resolve('dist'), path.resolve('client/dist')];

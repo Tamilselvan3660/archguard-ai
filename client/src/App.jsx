@@ -28,8 +28,22 @@ import './styles/archguard.css';
 
 export default function App() {
   const [appFlow, setAppFlow] = useState('splash'); // 'splash' -> 'auth' -> 'app'
-  const [currentUser, setCurrentUser] = useState(null);
-  const [cloudUser, setCloudUser] = useState(null); // separate cloud auth state
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('archguard_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [cloudUser, setCloudUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('archguard_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }); // cloud auth synced for single sign-on
   const [activeTab, setActiveTab] = useState('overview');
   const [scanData, setScanData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -247,20 +261,30 @@ export default function App() {
 
   const handleLogin = (user) => {
     setCurrentUser(user);
+    setCloudUser(user);
+    try {
+      localStorage.setItem('archguard_user', JSON.stringify(user));
+    } catch (e) {
+      console.warn('Storage save failed:', e);
+    }
     setAppFlow('app');
-    // cloudUser stays null — cloud vault requires separate authentication
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setCloudUser(null); // also clear cloud auth on logout
+    setCloudUser(null);
+    try {
+      localStorage.removeItem('archguard_user');
+    } catch (e) {
+      console.warn('Storage clear failed:', e);
+    }
     setAppFlow('auth');
     showToast('Logged out of architecture console');
   };
 
   // 1. Initial 2-second Animated Logo Transition Screen
   if (appFlow === 'splash') {
-    return <SplashScreen onComplete={() => setAppFlow('auth')} />;
+    return <SplashScreen onComplete={() => setAppFlow(currentUser ? 'app' : 'auth')} />;
   }
 
   // 2. Enterprise Authentication & SSO Portal
@@ -738,14 +762,18 @@ export default function App() {
               />
             )}
             {activeTab === 'cloud-storage' && (
-              cloudUser ? (
+              (cloudUser || currentUser) ? (
                 <CloudDashboard
-                  currentUser={cloudUser}
+                  currentUser={cloudUser || currentUser}
                   onShowToast={showToast}
                 />
               ) : (
                 <CloudAuthGate
-                  onAuthenticated={(user) => setCloudUser(user)}
+                  currentUser={currentUser}
+                  onAuthenticated={(user) => {
+                    setCloudUser(user);
+                    try { localStorage.setItem('archguard_user', JSON.stringify(user)); } catch {}
+                  }}
                   onShowToast={showToast}
                 />
               )

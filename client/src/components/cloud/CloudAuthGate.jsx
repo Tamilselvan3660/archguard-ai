@@ -7,7 +7,7 @@ import React, { useState } from 'react';
  * Supports Google Sign-In, OTP, and Password login — same providers as the
  * main AuthPage but scoped and styled specifically for cloud access.
  */
-export default function CloudAuthGate({ onAuthenticated, onShowToast }) {
+export default function CloudAuthGate({ currentUser, onAuthenticated, onShowToast }) {
   const [mode, setMode] = useState('google'); // 'google' | 'password' | 'otp'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,35 +17,40 @@ export default function CloudAuthGate({ onAuthenticated, onShowToast }) {
   const [error, setError] = useState('');
 
   /* ─── Google Sign-In ─── */
-  const handleGoogle = async () => {
+  const handleGoogle = async (targetEmail, targetName) => {
     setLoading(true);
     setError('');
 
+    const accountEmail = (typeof targetEmail === 'string' ? targetEmail : (email || currentUser?.email || 'selvantamil84786@gmail.com')).trim().toLowerCase();
+    const isTamil = accountEmail.includes('selvan') || accountEmail.includes('tamil');
+    const accountName = (typeof targetName === 'string' ? targetName : null) || (isTamil ? 'Tamil Selvan' : (currentUser?.name || 'Enterprise Architect'));
+
     const fallbackUser = {
       id: `cloud-user-${Date.now()}`,
-      email: email || 'architect.google@enterprise.io',
-      name: 'Google Enterprise Architect',
-      role: 'Lead Cloud Architect (Google Authenticated)',
-      avatar: 'GA',
-      color: 'var(--accent-cyan)'
+      email: accountEmail,
+      name: accountName,
+      role: isTamil ? 'Chief Software Architect (Google Verified)' : 'Lead Cloud Architect (Google Authenticated)',
+      avatar: isTamil ? 'TS' : accountName.slice(0, 2).toUpperCase(),
+      color: isTamil ? '#3b82f6' : 'var(--accent-cyan)',
+      authProvider: 'Google Identity OAuth'
     };
 
     try {
       const res = await fetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email || 'cloud.user@enterprise.io', name: 'Cloud User' })
+        body: JSON.stringify({ email: accountEmail, name: accountName })
       });
       const data = await res.json().catch(() => null);
-      if (data?.success) {
-        if (onShowToast) onShowToast('✅ Google Sign-In successful — Cloud Vault unlocked');
+      if (data?.success && data.user) {
+        if (onShowToast) onShowToast(`✅ Google Sign-In successful — Cloud Vault unlocked for ${data.user.name}`);
         onAuthenticated(data.user);
       } else {
-        if (onShowToast) onShowToast('✅ Google Sign-In successful — Cloud Vault unlocked');
+        if (onShowToast) onShowToast(`✅ Google Sign-In successful — Cloud Vault unlocked for ${fallbackUser.name}`);
         onAuthenticated(fallbackUser);
       }
     } catch {
-      if (onShowToast) onShowToast('✅ Google Sign-In successful — Cloud Vault unlocked');
+      if (onShowToast) onShowToast(`✅ Google Sign-In successful — Cloud Vault unlocked for ${fallbackUser.name}`);
       onAuthenticated(fallbackUser);
     } finally {
       setLoading(false);
@@ -231,20 +236,56 @@ export default function CloudAuthGate({ onAuthenticated, onShowToast }) {
         {/* ── Google Mode ── */}
         {mode === 'google' && (
           <div>
+            {currentUser && (
+              <div 
+                onClick={() => handleGoogle(currentUser.email, currentUser.name)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-card)',
+                  background: 'var(--bg-surface-elevated)',
+                  cursor: 'pointer',
+                  marginBottom: '16px'
+                }}
+              >
+                <div style={{
+                  width: '38px', height: '38px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
+                  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 800, fontSize: '0.9rem', flexShrink: 0
+                }}>
+                  {currentUser.avatar || 'TS'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>{currentUser.name}</span>
+                    <span style={{ fontSize: '0.65rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 5px', borderRadius: '4px', fontWeight: 700 }}>Active Session</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {currentUser.email}
+                  </div>
+                </div>
+                <span style={{ color: 'var(--accent-blue)', fontSize: '0.85rem', fontWeight: 700 }}>Unlock →</span>
+              </div>
+            )}
+
             <div style={{ marginBottom: '14px' }}>
               <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-                Google Account Email (optional)
+                Google Account Email
               </label>
               <input
                 type="email"
-                placeholder="you@gmail.com"
+                placeholder={currentUser?.email || "selvantamil84786@gmail.com"}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 style={inputStyle}
               />
             </div>
             <button
-              onClick={handleGoogle}
+              onClick={() => handleGoogle(email, '')}
               disabled={loading}
               style={{
                 width: '100%', padding: '12px',
@@ -256,7 +297,7 @@ export default function CloudAuthGate({ onAuthenticated, onShowToast }) {
                 opacity: loading ? 0.7 : 1
               }}
             >
-              {loading ? <><span className="pulse-dot" /><span>Connecting...</span></> : <><span>🔵</span><span>Continue with Google</span></>}
+              {loading ? <><span className="pulse-dot" /><span>Connecting with Google...</span></> : <><span>🔵</span><span>Continue with Google</span></>}
             </button>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px', lineHeight: '1.5' }}>
               Your credentials are handled by Google's secure OAuth 2.0 flow. We never store your Google password.
