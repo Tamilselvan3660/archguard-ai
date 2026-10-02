@@ -9,8 +9,8 @@ export default function Sidebar({
   onLogout,
   cloudAuthenticated = false
 }) {
-  const userName = currentUser?.name || 'Sarah Lin';
-  const userEmail = currentUser?.email || 'sarah.lin@enterprise.io';
+  const userName = currentUser?.name || 'Architect Account';
+  const userEmail = currentUser?.email || 'Sign in to access';
 
   // Helper for expanding/collapsing sections
   const [expandedSections, setExpandedSections] = useState({
@@ -181,11 +181,17 @@ export default function Sidebar({
 
       {/* Logged in User Profile Footer */}
       <div className="sidebar-user-footer" style={{ marginTop: 'auto' }}>
-        <div className="sidebar-user-name">{userName}</div>
-        <div className="sidebar-user-email">{userEmail}</div>
+        <div className="sidebar-user-name" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{userName}</div>
+        <div className="sidebar-user-email" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userEmail}</div>
         <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-          <button type="button" className="sidebar-logout-btn" style={{ flex: 1, padding: '5px 8px', fontSize: '0.74rem' }} onClick={() => { if (onLogout) onLogout(); }}>
-            <span>↳</span><span>Logout</span>
+          <button 
+            type="button" 
+            className="sidebar-logout-btn" 
+            style={{ flex: 1, padding: '6px 8px', fontSize: '0.74rem', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }} 
+            onClick={() => { if (onLogout) onLogout(); }}
+            title="Log out and return to account access screen"
+          >
+            <span>↳</span><span>Sign Out / Switch</span>
           </button>
         </div>
       </div>

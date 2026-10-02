@@ -24,6 +24,7 @@ import RepositoryManager from './components/RepositoryManager';
 import ArchitectureModelEditor from './components/ArchitectureModelEditor';
 import FitnessFunctions from './components/FitnessFunctions';
 import ArchitectureTests from './components/ArchitectureTests';
+import { defaultScanData } from './data/defaultScanData.js';
 import './styles/archguard.css';
 
 export default function App() {
@@ -31,7 +32,17 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('archguard_user');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const u = JSON.parse(saved);
+        // Do not auto-login with random mock demo IDs
+        const demoIds = ['super_admin', 'admin', 'authorizer', 'manager', 'developer', 'staff', 'user', 'viewer', 'guest', 'user-sarah', 'sarah_lin'];
+        if (demoIds.includes(u?.id) || demoIds.includes(u?.username) || (u?.email && u.email.endsWith('@enterprise.io') && !u.email.includes('tamil') && !u.email.includes('selvan'))) {
+          localStorage.removeItem('archguard_user');
+          return null;
+        }
+        return u;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -43,10 +54,10 @@ export default function App() {
     } catch {
       return null;
     }
-  }); // cloud auth synced for single sign-on
+  });
   const [activeTab, setActiveTab] = useState('overview');
-  const [scanData, setScanData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [scanData, setScanData] = useState(defaultScanData);
+  const [loading, setLoading] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState('sample-ecommerce');
   const [theme, setTheme] = useState(() => {
     try {
@@ -745,6 +756,67 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            {/* 8. Verified User Profile & Account Switcher */}
+            {currentUser && (
+              <div 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'var(--bg-surface-elevated)',
+                  border: '1px solid var(--border-card)',
+                  borderRadius: '24px',
+                  padding: '3px 12px 3px 6px',
+                  marginLeft: '4px'
+                }}
+              >
+                <div 
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    flexShrink: 0
+                  }}
+                >
+                  {currentUser.avatar || (currentUser.name ? currentUser.name.slice(0, 2).toUpperCase() : 'TS')}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, maxWidth: '140px', overflow: 'hidden' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    {currentUser.name}
+                  </span>
+                  <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    {currentUser.email}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  title="Sign out or switch accounts"
+                  style={{
+                    background: '#fee2e2',
+                    border: '1px solid #fecaca',
+                    color: '#b91c1c',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    marginLeft: '4px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
