@@ -1,18 +1,34 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 export default function SplashScreen({ onComplete }) {
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      onComplete();
-    }, 2000); // Exactly 2 seconds
+      if (onCompleteRef.current) {
+        onCompleteRef.current();
+      }
+    }, 1500);
 
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, []);
+
+  const handleSkip = () => {
+    if (onCompleteRef.current) {
+      onCompleteRef.current();
+    }
+  };
 
   return (
-    <div className="splash-container">
-      <div className="splash-content">
-        <div className="splash-logo-shield">
+    <div 
+      className="splash-container" 
+      onClick={handleSkip} 
+      style={{ cursor: 'pointer' }}
+      title="Click to enter platform immediately"
+    >
+      <div className="splash-content" onClick={(e) => e.stopPropagation()}>
+        <div className="splash-logo-shield" onClick={handleSkip} style={{ cursor: 'pointer' }}>
           🛡️
         </div>
 
@@ -32,6 +48,32 @@ export default function SplashScreen({ onComplete }) {
           <span className="pulse-dot"></span>
           <span>Initializing AST parser & dependency graph engine...</span>
         </div>
+
+        <button
+          type="button"
+          onClick={handleSkip}
+          style={{
+            marginTop: '24px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            color: '#94a3b8',
+            padding: '6px 16px',
+            borderRadius: '20px',
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.5)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = '#94a3b8';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+          }}
+        >
+          Enter Platform Now &rarr;
+        </button>
       </div>
     </div>
   );

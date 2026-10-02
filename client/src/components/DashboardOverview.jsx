@@ -11,10 +11,12 @@ export default function DashboardOverview({ scanData, onNavigateTab, onTriggerAI
     );
   }
 
-  const { health, techStack, violations } = scanData;
+  const health = scanData?.health || {};
+  const techStack = scanData?.techStack || [];
+  const violations = scanData?.violations || [];
   const healthScore = health.overallHealth || 85;
   const debt = health.architectureDebtIndex || 0;
-  const violationCount = violations?.length || 0;
+  const violationCount = violations.length;
   const cycleCount = health?.counts?.cycleCount || 0;
   const totalComponents = health?.counts?.totalElements || 0;
   const totalDependencies = health?.counts?.totalDependencies || 0;

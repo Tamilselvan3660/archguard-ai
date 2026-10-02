@@ -49,7 +49,11 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [selectedRepo, setSelectedRepo] = useState('sample-ecommerce');
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('archguard_theme') || 'light';
+    try {
+      return localStorage.getItem('archguard_theme') || 'light';
+    } catch {
+      return 'light';
+    }
   });
   const [toastMessage, setToastMessage] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -249,7 +253,8 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `archguard-audit-${scanData.repoName}-${new Date().toISOString().slice(0, 10)}.json`;
+    const repo = scanData?.repoName || selectedRepo || 'project';
+    a.download = `archguard-audit-${repo}-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     showToast('Downloaded Architecture Audit JSON Report');
     setShowExportModal(false);
