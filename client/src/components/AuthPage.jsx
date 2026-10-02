@@ -18,9 +18,10 @@ export default function AuthPage({ onLogin, onShowToast }) {
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(60);
   const [timerActive, setTimerActive] = useState(false);
-  const [otpPreviewUrl, setOtpPreviewUrl] = useState(null);
-  const [devOtpCode, setDevOtpCode] = useState(null);
-  const [isLiveSmtp, setIsLiveSmtp] = useState(false);
+  const [otpToken, setOtpToken] = useState(null);
+  const [otpExpiresAt, setOtpExpiresAt] = useState(null);
+  const [emailDelivered, setEmailDelivered] = useState(false);
+  const [needsSmtpConfig, setNeedsSmtpConfig] = useState(false);
 
   // Google Modal state
   const [showGoogleModal, setShowGoogleModal] = useState(false);
@@ -115,56 +116,48 @@ export default function AuthPage({ onLogin, onShowToast }) {
 
     setIsLoading(true);
     setErrorMsg(null);
-    setOtpPreviewUrl(null);
-
-    // Derive a secure 6-digit access code (from digits in email or generated)
-    const digitsInEmail = targetEmail.replace(/\D/g, '');
-    let resolvedCode = digitsInEmail.length === 6
-      ? digitsInEmail
-      : Math.floor(100000 + Math.random() * 900000).toString();
-
-    let serverPreview = null;
-    let serverDelivered = false;
 
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: targetEmail, code: resolvedCode })
+        body: JSON.stringify({ email: targetEmail })
       });
       const data = await res.json().catch(() => null);
-      if (data?.success) {
-        serverDelivered = true;
-        if (data.code) resolvedCode = data.code;
-        if (data.previewUrl) serverPreview = data.previewUrl;
+      if (res.ok && data?.success) {
+        setOtpToken(data.token);
+        setOtpExpiresAt(data.expiresAt);
+        setEmailDelivered(!!data.emailDelivered);
+        setNeedsSmtpConfig(!!data.needsSmtpConfig);
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtpStep('enter-code');
+        setTimer(60);
+        setTimerActive(true);
+
+        if (data.emailDelivered) {
+          if (onShowToast) onShowToast(`✓ Verification code dispatched to ${targetEmail}! Please check your email.`);
+        } else {
+          if (onShowToast) onShowToast(`Verification code sent to ${targetEmail}`);
+        }
+
+        setTimeout(() => {
+          if (inputRefs.current[0]) inputRefs.current[0].focus();
+        }, 150);
+      } else {
+        setErrorMsg(data?.error || 'Could not send verification code. Please check your email address or server settings.');
       }
-    } catch (err) {
-      console.log('OTP dispatch notice, fallback active:', err);
+    } catch {
+      setErrorMsg('Could not connect to authentication service. Please check your connection.');
     } finally {
       setIsLoading(false);
     }
-
-    // Always transition to verification step with code available
-    setOtpStep('enter-code');
-    setTimer(60);
-    setTimerActive(true);
-    setDevOtpCode(resolvedCode);
-    if (serverPreview) setOtpPreviewUrl(serverPreview);
-
-    if (onShowToast) {
-      onShowToast(`Verification code ready for ${targetEmail}`);
-    }
-
-    setTimeout(() => {
-      if (inputRefs.current[0]) inputRefs.current[0].focus();
-    }, 150);
   };
 
   // 3. Email OTP Verify
   const handleVerifyOtp = async (fullCode) => {
-    const code = fullCode || otpDigits.join('');
+    const code = (fullCode || otpDigits.join('')).trim();
     if (code.length < 6) {
-      setErrorMsg('Please enter all 6 digits of your verification code.');
+      setErrorMsg('Please enter all 6 digits of the code received in your email.');
       return;
     }
 
@@ -172,41 +165,32 @@ export default function AuthPage({ onLogin, onShowToast }) {
     setErrorMsg(null);
 
     const cleanEmail = email.trim().toLowerCase();
-    const isSiva = cleanEmail.includes('sivakumar') || cleanEmail === 'sivakumar463703@gmail.com';
-    const isTamil = cleanEmail.includes('selvan') || cleanEmail.includes('tamil') || cleanEmail === 'selvantamil84786@gmail.com';
-
-    const fallbackUser = {
-      id: `user-${Date.now()}`,
-      name: isSiva ? 'Sivakumar' : (isTamil ? 'Tamil Selvan' : cleanEmail.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase())),
-      username: isSiva ? 'Sivakumar' : (isTamil ? 'Tamil Selvan' : cleanEmail.split('@')[0]),
-      email: cleanEmail,
-      role: (isSiva || isTamil) ? 'Chief Software Architect (Email Verified)' : 'Verified Enterprise Architect',
-      avatar: isSiva ? 'SK' : (isTamil ? 'TS' : cleanEmail.slice(0, 2).toUpperCase()),
-      color: isSiva ? '#0284c7' : '#3b82f6',
-      authProvider: 'Email OTP Verification',
-      roles: ['SUPER_ADMIN', 'CHIEF_ARCHITECT', 'CLOUD_VAULT_AUTHORIZED']
-    };
 
     try {
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, otp: code, code })
+        body: JSON.stringify({
+          email: cleanEmail,
+          otp: code,
+          code,
+          token: otpToken,
+          expiresAt: otpExpiresAt
+        })
       });
       const data = await res.json().catch(() => null);
-      if (data?.success && data.user) {
+      if (res.ok && data?.success && data.user) {
         if (onShowToast) onShowToast(`✓ Welcome ${data.user.name}! Access granted.`);
         onLogin(data.user);
         return;
+      } else {
+        setErrorMsg(data?.error || 'Invalid verification code. Please check your email inbox and enter the 6-digit code received.');
       }
-    } catch (err) {
-      console.warn('Backend OTP verification notice, using verified account session:', err);
+    } catch {
+      setErrorMsg('Could not verify code with server. Please retry.');
     } finally {
       setIsLoading(false);
     }
-
-    if (onShowToast) onShowToast(`✓ Welcome ${fallbackUser.name}! Access granted.`);
-    onLogin(fallbackUser);
   };
 
   // 4. Password Login or Account Creation
@@ -486,25 +470,30 @@ export default function AuthPage({ onLogin, onShowToast }) {
                   ))}
                 </div>
 
-                {/* Helper info & sandbox preview if available */}
-                {devOtpCode && (
-                  <div style={{ background: 'rgba(2, 132, 199, 0.08)', border: '1px solid rgba(2, 132, 199, 0.25)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
-                      Access Code: <code style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0284c7' }}>{devOtpCode}</code>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const digits = devOtpCode.split('').slice(0, 6);
-                        setOtpDigits(digits);
-                        handleVerifyOtp(devOtpCode);
-                      }}
-                      style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Auto-Fill &amp; Enter
-                    </button>
+                {/* Verification Guidance Notice (Never exposes the code) */}
+                <div style={{
+                  background: emailDelivered ? 'rgba(16, 185, 129, 0.08)' : 'rgba(2, 132, 199, 0.08)',
+                  border: `1px solid ${emailDelivered ? 'rgba(16, 185, 129, 0.25)' : 'rgba(2, 132, 199, 0.25)'}`,
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '16px',
+                  textAlign: 'left'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span>{emailDelivered ? '📬' : '🛡️'}</span>
+                    <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {emailDelivered ? 'Verification Email Dispatched' : 'Security Passcode Required'}
+                    </span>
                   </div>
-                )}
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.45' }}>
+                    Open your email inbox for <strong style={{ color: 'var(--text-primary)' }}>{email}</strong> and enter the 6-digit code above. Only verified email owners can enter this portal.
+                  </p>
+                  {needsSmtpConfig && (
+                    <div style={{ marginTop: '8px', fontSize: '0.74rem', color: '#b45309', background: 'rgba(245, 158, 11, 0.12)', padding: '6px 10px', borderRadius: '6px', lineHeight: '1.4' }}>
+                      ⚙️ <strong>Admin Notice:</strong> Real email delivery requires <code>GMAIL_APP_PASSWORD</code> in server settings. You can also sign in directly using the <strong>Google Account</strong> tab.
+                    </div>
+                  )}
+                </div>
 
                 <button
                   type="button"
