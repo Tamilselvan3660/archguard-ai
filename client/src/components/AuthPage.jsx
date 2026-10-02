@@ -105,6 +105,9 @@ export default function AuthPage({ onLogin, onShowToast }) {
   const [customGoogleEmail, setCustomGoogleEmail] = useState('');
   const [showCustomGoogle, setShowCustomGoogle] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [otpPreviewUrl, setOtpPreviewUrl] = useState(null);
+  const [devOtpCode, setDevOtpCode] = useState(null);
+  const [isLiveSmtp, setIsLiveSmtp] = useState(false);
 
   const [selectedPersona, setSelectedPersona] = useState(personas[0]);
   const inputRefs = useRef([]);
@@ -279,8 +282,11 @@ export default function AuthPage({ onLogin, onShowToast }) {
         setOtpDigits(['', '', '', '', '', '']);
         setTimer(60);
         setTimerActive(true);
+        setOtpPreviewUrl(data.previewUrl || null);
+        setDevOtpCode(data.code || null);
+        setIsLiveSmtp(Boolean(data.isLiveSmtp));
         if (onShowToast) {
-          onShowToast(`Verification code sent to ${targetEmail}`);
+          onShowToast(data.message || `Verification code sent to ${targetEmail}`);
         }
         setTimeout(() => {
           inputRefs.current[0]?.focus();
@@ -954,27 +960,105 @@ export default function AuthPage({ onLogin, onShowToast }) {
                 {/* Email Verification Security Notice */}
                 <div 
                   style={{
-                    background: 'rgba(56, 189, 248, 0.08)',
-                    border: '1px solid rgba(56, 189, 248, 0.25)',
+                    background: isLiveSmtp ? 'rgba(56, 189, 248, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                    border: isLiveSmtp ? '1px solid rgba(56, 189, 248, 0.25)' : '1px solid rgba(245, 158, 11, 0.3)',
                     borderRadius: '10px',
                     padding: '14px 16px',
-                    marginBottom: '18px',
+                    marginBottom: '14px',
                     display: 'flex',
                     alignItems: 'flex-start',
                     gap: '12px'
                   }}
                 >
-                  <span style={{ fontSize: '1.35rem', lineHeight: 1 }}>📬</span>
-                  <div>
-                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#38bdf8', marginBottom: '4px' }}>
-                      Verification Code Sent to Email
+                  <span style={{ fontSize: '1.35rem', lineHeight: 1 }}>{isLiveSmtp ? '📬' : 'ℹ️'}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: isLiveSmtp ? '#38bdf8' : '#f59e0b', marginBottom: '4px' }}>
+                      {isLiveSmtp ? 'Verification Code Dispatched to Gmail' : 'Zero-Config Mailbox Active (No SMTP in .env)'}
                     </div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                      We have sent your 6-digit one-time passcode to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>. 
-                      Please check your inbox (or spam folder) and enter the code below to open the portal.
+                      {isLiveSmtp ? (
+                        <>We have sent your 6-digit one-time passcode to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>. Please check your inbox or spam folder.</>
+                      ) : (
+                        <>
+                          Google SMTP is unconfigured in <code>.env</code>, so your OTP was dispatched to a <strong>secure virtual web mailbox</strong>. You can view it below or auto-fill it instantly!
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
+
+                {/* Ethereal Mailbox Sandbox Action Card */}
+                {otpPreviewUrl && (
+                  <div style={{
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-indigo)' }}>
+                        📬 Delivered Email in Test Mailbox
+                      </span>
+                      {devOtpCode && (
+                        <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                          Code: {devOtpCode}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <a 
+                        href={otpPreviewUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          background: 'linear-gradient(135deg, #4f46e5, #0ea5e9)',
+                          color: '#fff',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          textDecoration: 'none',
+                          textAlign: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <span>🔗</span>
+                        <span>Open &amp; View Email in Browser</span>
+                      </a>
+                      {devOtpCode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const digits = devOtpCode.split('');
+                            setOtpDigits(digits);
+                            handleVerifyOtp(devOtpCode);
+                          }}
+                          style={{
+                            padding: '8px 14px',
+                            background: 'rgba(16, 185, 129, 0.2)',
+                            border: '1px solid rgba(16, 185, 129, 0.4)',
+                            color: '#10b981',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <span>⚡</span>
+                          <span>Auto-Fill Code</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* 6 Digit Input Boxes */}
                 <div className="otp-digit-inputs" onPaste={handlePaste}>

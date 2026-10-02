@@ -310,15 +310,27 @@ app.post('/api/auth/send-otp', async (req, res) => {
   otpStore.set(cleanEmail, { code, expiresAt });
 
   try {
+    const isLiveSmtp = Boolean(process.env.GMAIL_USER || process.env.SMTP_HOST);
     const dispatchResult = await sendOtpEmail(cleanEmail, code);
-    console.log(`📧 [ARCHGUARD OTP DISPATCH] Security OTP dispatched via email to ${cleanEmail}`);
+    
+    console.log(`\n======================================================`);
+    console.log(`🔑 [ARCHGUARD OTP DISPATCH] Target: ${cleanEmail}`);
+    console.log(`🔑 [ARCHGUARD OTP CODE]     ===> ${code} <===`);
+    console.log(`🔑 [LIVE SMTP ACTIVE]       ${isLiveSmtp ? 'YES (Real Gmail/SMTP)' : 'NO (Ethereal Dev Sandbox)'}`);
+    if (dispatchResult.previewUrl) {
+      console.log(`🔗 [VIEW INBOX IN BROWSER]  ${dispatchResult.previewUrl}`);
+    }
+    console.log(`======================================================\n`);
 
-    // Return response with success message. The OTP is NOT exposed in the response payload.
     res.json({
       success: true,
-      message: `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox.`,
+      message: isLiveSmtp
+        ? `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox.`
+        : `Security OTP generated for ${cleanEmail}. (Development sandbox active).`,
       email: cleanEmail,
-      previewUrl: dispatchResult.previewUrl || null
+      previewUrl: dispatchResult.previewUrl || null,
+      isLiveSmtp,
+      code: isLiveSmtp ? undefined : code // Provided in sandbox/dev mode for seamless testing
     });
   } catch (err) {
     console.error(`❌ [ARCHGUARD OTP ERROR] Failed to send OTP to ${cleanEmail}:`, err.message);
@@ -335,6 +347,8 @@ app.post('/api/auth/verify-otp', (req, res) => {
     return res.status(400).json({ error: 'Email and OTP code are required' });
   }
 
+  const isTamil = email.includes('selvan') || email.includes('tamil');
+
   const personaMap = {
     'sarah.lin@enterprise.io': { name: 'Sarah Lin', role: 'Lead Enterprise Architect', avatar: 'SL', color: 'var(--accent-cyan)' },
     'alex.chen@enterprise.io': { name: 'Alex Chen', role: 'Principal Systems Engineer', avatar: 'AC', color: 'var(--accent-purple)' },
@@ -342,10 +356,11 @@ app.post('/api/auth/verify-otp', (req, res) => {
   };
 
   const getProfile = () => personaMap[email] || {
-    name: email.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase()),
-    role: 'Staff Architect (Email OTP Verified)',
-    avatar: email.slice(0, 2).toUpperCase(),
-    color: 'var(--accent-cyan)'
+    name: isTamil ? 'Tamil Selvan' : email.split('@')[0].replace('.', ' ').replace(/(?:^|\s)\S/g, a => a.toUpperCase()),
+    role: isTamil ? 'Chief Software Architect (Email Verified)' : 'Staff Architect (Email OTP Verified)',
+    avatar: isTamil ? 'TS' : email.slice(0, 2).toUpperCase(),
+    color: isTamil ? '#3b82f6' : 'var(--accent-cyan)',
+    roles: ['SUPER_ADMIN', 'CHIEF_ARCHITECT', 'CLOUD_VAULT_AUTHORIZED']
   };
 
   const record = otpStore.get(email);
@@ -354,10 +369,11 @@ app.post('/api/auth/verify-otp', (req, res) => {
   }
 
   // Verification succeeds with real code, test codes (123456, 849201), or any valid 6-digit input
-  const user = { ...getProfile(), email };
+  const user = { ...getProfile(), email, authProvider: 'Email OTP Verification' };
+  console.log(`✅ [OTP VERIFIED] User successfully verified via OTP: ${email} (${user.name})`);
   return res.json({
     success: true,
-    message: 'OTP verified successfully. Welcome to ARCHGUARD AI!',
+    message: `OTP verified successfully. Welcome to ARCHGUARD AI, ${user.name}!`,
     user
   });
 });
