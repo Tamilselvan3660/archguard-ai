@@ -1,0 +1,49 @@
+# Intended Software Architecture Specification — e-Commerce System
+
+architecture:
+  name: "eCommerce Enterprise Platform"
+  pattern: "Layered / Hexagonal Architecture"
+  layers:
+    presentation:
+      description: "HTTP Controllers, UI Components, and API Gateway"
+      allowed_dependencies:
+        - application
+
+    application:
+      description: "Use Cases, Command Handlers, and DTOs"
+      allowed_dependencies:
+        - domain
+
+    domain:
+      description: "Core Business Domain Entities, Value Objects, and Domain Services"
+      allowed_dependencies: []
+
+    infrastructure:
+      description: "Database Drivers, External API Adapters, and System Config"
+      allowed_dependencies:
+        - domain
+
+rules:
+  - id: "RULE-001"
+    name: "no-ui-database-access"
+    severity: "HIGH"
+    category: "LAYER_VIOLATION"
+    source: "presentation"
+    forbidden:
+      - "infrastructure"
+    description: "Presentation layer components must never import or access infrastructure/database directly."
+
+  - id: "RULE-002"
+    name: "no-domain-infrastructure-coupling"
+    severity: "CRITICAL"
+    category: "BOUNDARY_VIOLATION"
+    source: "domain"
+    forbidden:
+      - "infrastructure"
+    description: "Domain entities must remain pure and free from direct infrastructure code coupling."
+
+  - id: "RULE-003"
+    name: "no-circular-domain-dependencies"
+    severity: "HIGH"
+    category: "CIRCULAR_DEPENDENCY"
+    description: "Domain services must not form cyclic dependencies."

@@ -1,0 +1,3 @@
+ARCHGUARD MULTI-CLOUD SPECIFICATION
+Version 2.0
+Provider Abstraction Verified

@@ -1,0 +1,34 @@
+# ==============================================================================
+# ARCHGUARD AI — RENDER DEPLOYMENT BLUEPRINT SPECIFICATION
+# ==============================================================================
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: archguard-backend
+    runtime: node
+    plan: free
+    region: oregon # Alternatives: frankfurt, ohio, singapore
+    buildCommand: npm install
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false # Paste your Neon PostgreSQL connection string here in Render Dashboard
+      - key: FRONTEND_URL
+        sync: false # Set to your deployed Vercel domain (e.g. https://archguard-ai.vercel.app)
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
